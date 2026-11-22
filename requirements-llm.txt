@@ -1,0 +1,6 @@
+# Optional, not required for the tested offline/extractive demo.
+# Resolve and lock compatible Torch/SentenceTransformers packages on the target hardware.
+torch>=2.6,<3
+transformers>=4.51,<5
+sentence-transformers>=3.4,<6
+accelerate>=1,<2

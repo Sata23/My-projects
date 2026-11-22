@@ -1,0 +1,29 @@
+name: TelecomIQ validation
+on:
+  push:
+    branches: [main, 'telecom/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m compileall -q telecomiq
+      - run: python -m pytest -q tests
+      - name: Validate executable notebook structure
+        run: python -c "import nbformat; nbformat.validate(nbformat.read('notebooks/TelecomIQ_POC_to_Production_2.ipynb',as_version=4))"
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - run: docker build --tag telecomiq:ci .

@@ -1,0 +1,24 @@
+name: Build reviewed container release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - name: Authenticate registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and publish immutable commit tag
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/telecomiq:${GITHUB_SHA}"
+          docker build --tag "$IMAGE" .
+          docker push "$IMAGE"
+      # Deploy this exact SHA image through the chosen hosting platform.
+      # No hosting account or endpoint was supplied; this workflow publishes an image only.

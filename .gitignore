@@ -1,0 +1,15 @@
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+*.pyc
+.env
+.env.*
+!.env.example
+runtime/
+runtime_*/
+private/
+*.sqlite*
+*.key
+.cache/
+exports/
+dist/

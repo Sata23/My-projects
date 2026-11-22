@@ -1,0 +1,10 @@
+.git
+.env*
+runtime*
+*.sqlite*
+__pycache__
+.pytest_cache
+tests
+notebooks
+simulation
+dist

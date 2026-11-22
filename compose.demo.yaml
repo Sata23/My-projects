@@ -1,0 +1,14 @@
+services:
+  telecomiq:
+    build: .
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      TELECOM_DEMO: "true"
+      PUBLIC_BASE_URL: http://127.0.0.1:8000
+      TELECOM_DATA_DIR: /app/runtime
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/runtime:uid=10001,gid=10001,mode=0700
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
