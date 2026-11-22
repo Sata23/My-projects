@@ -119,3 +119,18 @@ def test_unknown_role_denied_and_env_mapping_is_complete(engine):
  key=next(iter(access));issuer,sub=key.split('|')
  mapped=map_identity({'iss':issuer,'sub':sub},issuer,access)
  assert mapped['purposes']==['analytics']
+
+def test_enriched_analytics_scoping_and_counter_math(engine):
+ d=engine.dashboard(DEMO_PROFILES['analyst']);assert d['asset_summary']=={'sample_assets':720,'online':504,'offline':36,'degraded':108,'telemetry_missing':72}
+ assert len(d['hourly'])==24 and sum(r['sample_subscribers'] for r in d['plan_mix'])==3000
+ assert sum(r['tickets'] for r in d['ticket_mix'])==len(engine.data['tickets'])
+ for rat in d['rat_kpis']:
+  nw=engine.data['network'];g=nw[(nw.technology==rat['technology'])&(nw.date>='2026-11-15')]
+  assert rat['drop_pct']==pytest.approx(100*g.dropped_calls.sum()/g.connected_calls.sum())
+ h=engine.data['hourly_traffic'];assert sum(r['traffic_gb'] for r in d['hourly'])==pytest.approx(h.traffic_gb.sum())
+ south=engine.dashboard(DEMO_PROFILES['noc_south']);assert all(a['zone']=='South' for a in south['assets'])
+ assert south['asset_summary']['sample_assets']==12*south['metrics']['cities']
+ one=engine.dashboard(DEMO_PROFILES['analyst'],{'city':'Bengaluru'});assert len(one['assets'])==12 and one['data_inventory']['hourly_city_records']==24
+ q=engine.chat('Analyze Bengaluru sensors with missing heartbeats',DEMO_PROFILES['analyst'])
+ assert q['outcome']=='answered' and 'SYN-ASSETS' in q['sources'] and 'fictional sample assets' in q['answer']
+ assert all(r['passed']==r['total'] for r in engine.data['quality'])

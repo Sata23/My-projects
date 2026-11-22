@@ -23,11 +23,20 @@ Open http://127.0.0.1:8000. Or `docker compose -f compose.demo.yaml up --build`.
 Run `pip install -r requirements-dev.txt` then `python -m pytest -q tests`.
 
 ## Analyst experience
-Executive KPIs, city/zone/tier filters; Network & coverage with zoom/pan/tooltips and RGB priority map;
+Executive KPIs, city/zone/tier filters; Assets & telemetry with 720 sample assets; Network & coverage with zoom/pan/tooltips and RGB priority map;
 masked Customers; Revenue & churn; Forecast & recommendations; synthetic Spectrum planning;
 Policy hub; grounded Chat agent; independent HITL review queue; separate Observability; Architecture.
 CSV exports obey current server scope. Print-to-PDF is available through the browser. This release
 does not claim native Power BI embedding or native XLSX/PPT export; the CSV gold tables can feed Power BI.
+
+## Enriched analytics update
+The offline application now embeds the full 365-day daily history and all 36 finance months,
+720 fictional asset records (504 online, 108 degraded, 36 offline, 72 missing heartbeats),
+1,440 hourly city observations for 21 Nov, service-plan sample mix, ticket categories and weighted
+4G/5G comparisons. These sample asset/hourly scenarios are separate from population daily counters.
+The map fits authorized locations after tab entry and resizing. Normal wheel scrolling scrolls the
+page; Ctrl/Command + wheel or the buttons zoom. City labels appear when zoomed to reduce collisions.
+Use the visible plot count and city table to verify the active filter scope.
 
 ## RAG and agents
 Ingestion: catalogue → parse → redact → overlapping chunks → embedding → SQLite vector persistence.

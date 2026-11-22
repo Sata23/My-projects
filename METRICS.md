@@ -34,3 +34,11 @@ Additional production feeds: OSS/BSS/CDR mediation, alarms, cell/site topology, 
 finance reconciliation, CRM case ownership, recharge/collections, portability, enterprise SLA contracts,
 device telemetry and consent-controlled customer events. These require governed connectors and official
 definitions before using this prototype for operational reporting. No model output auto-denies service.
+
+## Enriched scenario fields
+- Asset status: 12 fictional samples/city. Online, Offline, Degraded and Telemetry missing are simulation states; they do not determine the city’s population risk metric. No heartbeat does not prove an outage.
+- Asset criticality: Offline=High, Degraded/Telemetry missing=Medium, Online=Low, using internal sample rules.
+- Hourly traffic: sum of 60 city scenarios on 21 Nov; PRB and latency use resource/probe denominators. Hourly scenarios are independent of daily OSS counters and cannot be reconciled as a daily partition.
+- Service-plan mix: historical customer sample counts and mean bills/model scores; not the operator subscriber population or population ARPU.
+- Complaint mix: counts by registered ticket category, with no population incidence claim.
+- Offline file now contains 365 daily dates and 36 monthly dates. Full-year network charts retain counter-weighted rates.

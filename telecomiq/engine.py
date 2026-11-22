@@ -6,6 +6,7 @@ from .data import build_data,CITIES,AS_OF
 from .models import fit_models
 from .knowledge import catalog,redact,digest
 from .agents import *
+from .enrichment import enrich_data,scoped_enrichment
 ZONES=sorted(CITIES.zone.unique())
 DEMO_PROFILES={
  'analyst':{'sub':'demo-analyst','tenant':'telecom-demo','roles':['telecom_analyst'],'zones':ZONES,'cities':['All'],'purposes':['analytics']},
@@ -33,7 +34,7 @@ def records(df):return json.loads(df.to_json(orient='records',date_format='iso')
 class Engine:
  def __init__(self,root='runtime',smoke=False,pii_key=None,embedding_backend='sparse',llm_backend='extractive',demo=True):
   self.root=Path(root);self.root.mkdir(parents=True,exist_ok=True);self.db=self.root/'telecomiq.sqlite';self.demo=demo;self.lock=threading.RLock();self.requests=[];self.audit=[];self.staged={};self.case_lock=threading.RLock()
-  self.data=build_data(self.root,pii_key,smoke);self.cipher=Fernet(self.data.pop('pii_key'));self.models=fit_models(self.data);self.docs=catalog();self.initial_trace=StageTrace()
+  self.data=build_data(self.root,pii_key,smoke);self.data.update(enrich_data(self.data));self.cipher=Fernet(self.data.pop('pii_key'));self.models=fit_models(self.data);self.docs=catalog();self.initial_trace=StageTrace()
   self.parser=ParserAgent();self.redactor=RedactionAgent();self.chunker=ChunkingAgent();self.embedder=EmbeddingAgent(embedding_backend);self.vector=VectorDBAgent(self.db);self.searcher=VectorSearchAgent();self.intent=IntentAgent();self.context=ContextEnrichmentAgent();self.generator=GenerationAgent(llm_backend);self.validator=ValidationAgent();self.hitl=HITLAgent()
   self.reindex(self.initial_trace)
   with self.connect() as con:
@@ -97,13 +98,13 @@ class Engine:
   return sanitize(out)
  def dashboard(self,identity,filters=None):
   f,allowed=self.scope(identity,filters);m=self.summary(identity,f);cities=self.city_rows(identity,f);r=self.frame('daily_revenue',identity,f);nw=self.frame('network',identity,f);month=self.frame('monthly',identity,f)
-  revenue=records(r[r.date>=AS_OF-pd.Timedelta(days=30)].groupby('date',as_index=False).billed_service_revenue_inr.sum());trend=[]
-  for day,g in nw[nw.date>=AS_OF-pd.Timedelta(days=30)].groupby('date'):
+  revenue=records(r[r.date>=AS_OF-pd.Timedelta(days=365)].groupby('date',as_index=False).billed_service_revenue_inr.sum());trend=[]
+  for day,g in nw[nw.date>=AS_OF-pd.Timedelta(days=365)].groupby('date'):
    trend.append({'date':day.isoformat(),'drop_pct':100*float(g.dropped_calls.sum()/g.connected_calls.sum()),'availability_pct':100*(1-float(g.unavailable_site_minutes.sum()/g.eligible_site_minutes.sum()))})
   mt=month.groupby('month',as_index=False).agg(revenue=('billed_service_revenue_inr','sum'),opening=('opening_subscribers','sum'),churned=('churned_subscribers','sum'),closing=('closing_subscribers','sum'));mt['churn_pct']=mt.churned/mt.opening*100
   forecast=self.models['forecasts'];forecast=forecast[forecast.city.isin(allowed)];fc=records(forecast.groupby('month',as_index=False).forecast_revenue_inr.sum())
   review_value=sum(c['revenue_mtd_inr'] for c in cities if c['criticality']!='Low')
-  return sanitize({'filters':f,'metrics':m,'city_rows':cities,'review_linked_mtd_inr':review_value,'revenue_trend':revenue,'network_trend':trend,'monthly':records(mt.tail(12)),'forecast':fc,'model_metrics':self.models['model_metrics'],'model_selection':self.models['model_selection'],'subgroup_metrics':self.models['subgroup_metrics'],'forecast_evaluation':[r for r in self.models['forecast_eval'] if r['city'] in allowed], 'drift':self.models['drift'],'quality':self.data['quality'],'data_notice':'Synthetic operator aggregates; customer sample is not population. Internal alerts are not TRAI compliance findings.'})
+  return sanitize({**scoped_enrichment(self,identity,f),'filters':f,'metrics':m,'city_rows':cities,'review_linked_mtd_inr':review_value,'revenue_trend':revenue,'network_trend':trend,'monthly':records(mt),'forecast':fc,'model_metrics':self.models['model_metrics'],'model_selection':self.models['model_selection'],'subgroup_metrics':self.models['subgroup_metrics'],'forecast_evaluation':[r for r in self.models['forecast_eval'] if r['city'] in allowed], 'drift':self.models['drift'],'quality':self.data['quality'],'data_notice':'Synthetic operator aggregates; customer sample is not population. Internal alerts are not TRAI compliance findings.'})
  def retrieve(self,q,identity,filters,trace,k=4):
   with self.lock:
    policy_date=AS_OF.date() if self.demo else pd.Timestamp.now(tz='UTC').date();rows=self.vector.authorized(identity,filters,policy_date,trace);v=self.embedder.query(q,trace);return self.searcher.run(rows,v,self.embedder.model_id,trace,k)
@@ -154,11 +155,14 @@ class Engine:
      else:policy_claims=[]
      self.hitl.required(intent,trace)
      with trace.span('analyst_tool_narrative',{'backend':'governed deterministic calculations'}):answer=self.analyst_answer(identity,f,m)
+     if re.search(r'asset|sensor|heartbeat|telemetry',safe_q,re.I):
+      a=self.frame('assets',identity,f);missing=a[a.sensor_status.eq('No heartbeat')];ids=', '.join(missing.asset_id.head(5)) or 'none'
+      answer+=f"\n\nAsset telemetry: {len(a)} fictional sample assets; {len(missing)} have no heartbeat. Example affected IDs: {ids}. Missing data do not confirm an equipment outage; verify collector connectivity and last-seen timestamps before equipment changes. [SYN-ASSETS]"
      if policy_claims:answer+='\n\nApproved playbook context: '+policy_claims[0]['quote']+' ['+policy_claims[0]['source_id']+']'
      sources=re.findall(r'\[([^\]]+)\]',answer)
    if intent!='action':self.hitl.required(intent,trace)
    with trace.span('final_source_validation'):
-    rows=self.vector.authorized(identity,f,AS_OF.date() if self.demo else pd.Timestamp.now(tz='UTC').date(),trace);valid={c['chunk_id'] for c,*_ in rows}|{'GOLD-NETWORK','GOLD-FINANCE','GOLD-TICKETS','MODEL-FORECAST'}
+    rows=self.vector.authorized(identity,f,AS_OF.date() if self.demo else pd.Timestamp.now(tz='UTC').date(),trace);valid={c['chunk_id'] for c,*_ in rows}|{'GOLD-NETWORK','GOLD-FINANCE','GOLD-TICKETS','MODEL-FORECAST','SYN-ASSETS'}
     if not set(sources)<=valid:raise ValueError('Unresolved or unauthorized source')
   except ScopeConflict as exc:outcome='clarify';answer=str(exc)
   except PermissionError:outcome='blocked';answer='Access denied for the requested tenant, role, zone or city.'

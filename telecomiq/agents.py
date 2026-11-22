@@ -121,7 +121,7 @@ class IntentAgent:
    elif re.search(r'actual (?:loss|profit|savings)|guarantee|confirmed root|fully compliant|market share|competitor',low):intent='unsupported'
    elif re.search(r'trai|regulat|licen[cs]|nfap|spectrum assignment|wpc|legal',low):intent='regulatory'
    elif re.search(r'forecast|project.*revenue|next (?:three|3) months',low):intent='forecast'
-   elif re.search(r'kpi|risk|analy|recommend|revenue|arpu|churn|network|availability|drop|congestion|latency|ticket|nps|csat|customer|city|traffic|throughput',low):intent='analytics'
+   elif re.search(r'kpi|risk|analy|recommend|revenue|arpu|churn|network|availability|drop|congestion|latency|ticket|nps|csat|customer|city|traffic|throughput|asset|sensor|heartbeat|telemetry',low):intent='analytics'
    else:intent='policy'
    ev['detail']={'intent':intent,'mode':'deterministic allowlisted routing'};return intent
 
